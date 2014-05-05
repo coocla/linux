@@ -36,7 +36,7 @@ def upload(abspath, relpath, filename):
   ftp.connect(HOST)
   ftp.login(USER, PASS)
   bufsize = 1024
-  ftp.cwd("res1.hg.game2.com.cn")
+  ftp.cwd("xxxx")
   try:
     ftp.cwd(relpath)
   except:
