@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
+# This is a new file will be automatically uploaded to the ftp python script.
+# Author: http://blog.coocla.org
 
 import pyinotify
 import os
