@@ -15,7 +15,7 @@ pid_file="/tmp/monitor_upload.pid"
 log_file="/tmp/monitor_upload.log"
 
 class OnCreateClick(pyinotify.ProcessEvent):
-  def process_IN_CREATE(self, event):
+  def process_IN_CLOSE_WRITE(self, event):
     abspath=os.path.join(event.path, event.name)
     if os.path.isdir(abspath):
       print "create directory:  %s" % event.name
@@ -28,7 +28,7 @@ class OnCreateClick(pyinotify.ProcessEvent):
 def main():
   wm = pyinotify.WatchManager()
   notifier = pyinotify.Notifier(wm, OnCreateClick())
-  wm.add_watch(WATCHDIR, pyinotify.IN_CREATE, rec=True, auto_add=True)
+  wm.add_watch(WATCHDIR, pyinotify.IN_CLOSE_WRITE, rec=True, auto_add=True)
   notifier.loop(daemonize=True, pid_file=pid_file, stdout=log_file)
 
 def upload(abspath, relpath, filename):
