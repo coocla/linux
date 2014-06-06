@@ -98,13 +98,10 @@ class Domain(object):
     def SendDomain(self):
         for single in self.List():
             self.LastRet(single)
-        #self.LastRet({'records': u'836', 'name': u'youxi.com', 'id': 225747})
 
     def LastRet(self, single_domain):
         index = 0
         while 1:
-            print "@@ ### DEBUG ### @@"
-            print index
             if index+499 < int(single_domain["records"]):
                 ret = RecordList(
                         email = self.login_email,
