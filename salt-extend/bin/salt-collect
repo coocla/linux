@@ -1,0 +1,13 @@
+import sys
+from collector import Server
+
+def usage():
+    print "Usage: %s %s|%s|%s" % (sys.argv[0], "start", "stop", "restart")
+
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        usage()
+    else:
+        server = Server.ListenEvent("/var/run/salt-collect.pid")
+        getattr(server, sys.argv[1])()

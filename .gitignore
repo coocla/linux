@@ -1,0 +1,7 @@
+build/
+collector.egg-info/
+dist/
+*.swp
+*.swn
+*.pyc
+*.pyo
