@@ -1,0 +1,12 @@
+import sys
+from logmonitor.server import client
+
+def usage():
+    print "Usage: log-client start|stop|restart"
+    sys.exit(2)
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        usage()
+    Client = client.RunClient()#('/var/run/logmonitor_client.pid')
+    getattr(Client, sys.argv[1])()

@@ -4,15 +4,16 @@ import os
 import sys
 import time
 import yaml
-import daemon
 import socket
 import threading
-import logger
-from logger import __opts__
 from datetime import datetime
 
-logger.setup_log(root=__file__)
-LOG = logger.getLogger(__file__)
+from logmonitor.lib import utils
+from logmonitor.lib import daemon
+from logmonitor.lib import log as logging
+
+LOG = logging.getLogger(__name__)
+options = utils.get_options(LOG=LOG)
 
 def generate_timename(isdir=False):
     """dynamic generate dirname or timestamp"""
@@ -22,12 +23,13 @@ def generate_timename(isdir=False):
 
 def logfile_call():
     """Return list about match inputfile options"""
-    logfile_dir = __opts__['input_dir'] + "/" + generate_timename(isdir=True)
+    logfile_dir = options['input_dir'] + "/" + generate_timename(isdir=True)
     logfile_dir = os.path.normpath(logfile_dir)
-    match_input_file = __opts__['inputfile']
+    match_input_file = options['inputfile']
     try:
         logfile = os.listdir(logfile_dir)
-    except:
+    except Exception,e:
+        LOG.error("list logdir %s" % e)
         return []
     match_file = filter(lambda x: filter(lambda y: x.startswith(y), match_input_file), logfile)
     return map(lambda x: os.path.normpath(logfile_dir + "/" + x), match_file)
@@ -40,13 +42,14 @@ def tail_f(logfile):
         LOG.error("No such file or directory for %s" % logfile)
         return "No such file or directory"
     timestamp = generate_timename()
-    if __opts__["posfile_dir"].startswith("/"):
-        posfile_dir = __opts__["posfile_dir"]
+    today = generate_timename(isdir=True)
+    if options["posfile_dir"].startswith("/"):
+        posfile_dir = options["posfile_dir"]
     else:
-        posfile_dir = os.getcwd() + "/" + __opts__["posfile_dir"]
-    posfile = os.path.normpath(posfile_dir + "/" + os.path.splitext(logfile.split("/")[-1])[0] + ".pos")
+        posfile_dir = os.getcwd() + "/" + options["posfile_dir"]
+    posfile = os.path.normpath(posfile_dir + "/" + today + os.path.splitext(logfile.split("/")[-1])[0] + ".pos")
     LOG.info("Current pos file is %s" % posfile)
-    logtype = filter(lambda x: logfile.split("/")[-1].startswith(x), __opts__["inputfile"])[0]
+    logtype = filter(lambda x: logfile.split("/")[-1].startswith(x), options["inputfile"])[0]
     while True:
         try:
             current_pos = file(posfile, "r").readline().strip()
@@ -57,7 +60,7 @@ def tail_f(logfile):
         f_obj.seek(int(current_pos))
         data = f_obj.readline().strip()
         if not data:
-            time.sleep(__opts__.get("interval", 120))
+            time.sleep(options.get("interval", 120))
             continue
         data = str({logtype: data})
         if send_data(data):
@@ -75,7 +78,7 @@ def send_data(data):
     while True: 
         try:
             s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-            s.connect((__opts__.get("server", "127.0.0.1"), __opts__.get("port", 5678)))
+            s.connect((options.get("server", "127.0.0.1"), options.get("port", 5678)))
             break
         except:
             LOG.error("Can not connect to server, try connect...")
@@ -91,11 +94,11 @@ def send_data(data):
         return False
 
 def reset_posfile():
-    posfile_dir = __opts__["posfile_dir"]
+    posfile_dir = options["posfile_dir"]
     if not posfile_dir.startswith("/"):
         posfile_dir = os.getcwd() + "/" + posfile_dir
-    for f in os.listdir(posfile_dir):
-        targetFile = os.path.join(posfile_dir, f)
+    for file in os.listdir(posfile_dir):
+        targetFile = os.path.join(posfile_dir, file)
         if os.path.isfile(targetFile):
             file(targetFile, "w").write("0")
      
@@ -103,13 +106,14 @@ def reset_posfile():
 def fork_thread():
     while not logfile_call():
         LOG.info("Not found logfile dir or no match file")
-        time.sleep(5)
+        time.sleep(options["interval"])
     LOG.info("Found logfile %s" % logfile_call())
     starttime = generate_timename()
     sended_file_list = []
     while True:
         if starttime != generate_timename():
             LOG.info("Switch log dir to %s" % generate_timename(isdir=True))
+            clean_oldposfile()
             send_file_list = logfile_call()
             sended_file_list = []
             starttime = generate_timename()
@@ -132,30 +136,37 @@ def fork_thread():
         time.sleep(120)
 
 def check_enum():
-    for arg in __opts__:
+    for arg in options:
+        LOG.info("Check running environment.")
         if arg.endswith("dir"):
-            if os.path.isdir(__opts__[arg]):
+            if os.path.isdir(options[arg]):
+                LOG.info("Dir %s ok" % options[arg])
                 return True
             try:
-                os.mkdir(__opts__[arg])
-                LOG.info('"%s" not a directory, create it' % __opts__[arg])
+                os.mkdir(options[arg])
+                LOG.info('"%s" not a directory, create it' % options[arg])
                 return True
             except Exception,e:
-                LOG.info("Create %s fail, %s" % (__opts__[arg],e))
+                LOG.info("Create %s fail, %s" % (options[arg],e))
                 return False
 
-class LOG_POS(daemon.Daemon):
+def clean_oldposfile():
+    for old_pos in os.listdir(options["posfile_dir"]):
+        today = generate_timename(isdir=True)
+        if not old_pos.startswith(today):
+            try:
+                os.remove(old_pos)
+                LOG.info("Delete old pos file %s" % old_pos)
+            except Exception,e:
+                LOG.error("Delete old pos file %s Fail" % old_pos)
+
+
+class RunClient(daemon.Daemon):
     def run(self):
         if check_enum():
+            clean_oldposfile()
             fork_thread()
 
 if __name__ == '__main__':
-    if sys.argv[1] == "start":
-        log_pos = LOG_POS('/var/run/log_monitor_client.pid')
-        log_pos.start()
-    if sys.argv[1] == "stop":
-        log_pos = LOG_POS('/var/run/log_monitor_client.pid')
-        log_pos.stop()
-    if sys.argv[1] == "restart":
-        log_pos = LOG_POS('/var/run/log_monitor_client.pid')
-        log_pos.restart()
+    Client = RunClient('/var/run/logmonitor_client.pid')
+    getattr(Client, sys.argv[1])()
