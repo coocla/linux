@@ -11,7 +11,6 @@ HOST="xxxxxx"
 USER="xxxxxx"
 PASS="xxxxxx"
 pid_file="/var/run/autoupload.pid"
-log_file="/data/autoipload.log"
 
 class OnCreateClick(pyinotify.ProcessEvent):
   def process_IN_CLOSE_WRITE(self, event):
@@ -28,7 +27,7 @@ def main():
   wm = pyinotify.WatchManager()
   notifier = pyinotify.Notifier(wm, OnCreateClick())
   wm.add_watch(WATCHDIR, pyinotify.IN_CLOSE_WRITE, rec=True, auto_add=True)
-  notifier.loop(daemonize=True, pid_file=pid_file, stdout=log_file)
+  notifier.loop(daemonize=True, pid_file=pid_file)
 
 
 def upload(abspath, relpath, relname):
